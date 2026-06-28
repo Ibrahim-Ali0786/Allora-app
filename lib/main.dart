@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, deprecated_member_use
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // For kDebugMode
 import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path_provider/path_provider.dart';
@@ -9,44 +10,45 @@ import 'package:path/path.dart';
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
+import 'package:workmanager/workmanager.dart'; // Phase 2
+
 import 'screens/auth/welcome_screen.dart';
 import 'screens/chat_list_screen.dart';
 import './background_wiper.dart';
+import 'providers/network_provider.dart'; // Phase 1
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize Supabase
+  // 1. Initialize OS Background Task Listener
+  Workmanager().initialize(callbackDispatcher, isInDebugMode: kDebugMode);
+
   await Supabase.initialize(
     url: 'https://rwkebciwvsmavsigdrfa.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3a2ViY2l3dnNtYXZzaWdkcmZhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3NjI2NzksImV4cCI6MjA5NjMzODY3OX0.8E1Y4G23Lwojda86Z-R5ZSUFrwDk3MTjysWwxNpRbAM',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...', // Kept your key intact
   );
 
-  // 2. Initialize the modern SQLite Database using .init()
   final dir = await getApplicationSupportDirectory();
   final dbPath = join(dir.path, 'allora_matrix.db');
-
   final sqliteDb = await openDatabase(dbPath);
+  final matrixDb =
+      await MatrixSdkDatabase.init('allora_matrix', database: sqliteDb);
 
-  final matrixDb = await MatrixSdkDatabase.init(
-    'allora_matrix',
-    database: sqliteDb,
+  final client = Client('AlloraClient', database: matrixDb);
+  await client.init(newHomeserver: Uri.parse('https://matrix.allorachat.app'));
+
+  // Wrap with ProviderScope and inject the Matrix Client
+  runApp(
+    ProviderScope(
+      overrides: [
+        matrixClientProvider.overrideWithValue(client),
+      ],
+      child: AlloraApp(client: client),
+    ),
   );
-
-  // 3. Initialize the Client properly (Positional Name + Required Database)
-  final client = Client(
-    'AlloraClient',
-    database: matrixDb,
-  );
-
-  await client.init(
-    // Ensure there is no trailing slash
-    newHomeserver: Uri.parse('https://matrix.allorachat.app'),
-  );
-
-  runApp(ProviderScope(child: AlloraApp(client: client)));
 }
+
+// ... Keep your exact AlloraApp and _AlloraAppState classes below as they are ...
 
 class AlloraApp extends StatefulWidget {
   final Client client;

@@ -1,7 +1,6 @@
 // ignore_for_file: unnecessary_non_null_assertion, unused_element, curly_braces_in_flow_control_structures, unused_import, unnecessary_string_interpolations, use_build_context_synchronously, deprecated_member_use
 
 import 'dart:async';
-import 'package:allora/screens/networks/network_meta.dart';
 import 'package:flutter/material.dart' hide Visibility;
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
