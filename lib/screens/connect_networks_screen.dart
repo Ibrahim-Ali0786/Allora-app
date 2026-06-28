@@ -4,7 +4,7 @@ import 'package:flutter/material.dart' hide Visibility;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import './telegram_connection.dart';
 import './facebook_messenger_connection.dart';
 import './discord_connection.dart';
 import './slack_connection.dart';
@@ -251,6 +251,13 @@ class _ConnectNetworksScreenState extends ConsumerState<ConnectNetworksScreen> {
         break;
       case 'X':
         showTwitterConnectSheet(
+            context: context,
+            client: widget.client,
+            onConnected: _detectConnections);
+        break;
+
+      case 'Telegram': // <-- ADDED TELEGRAM CASE
+        showTelegramConnectSheet(
             context: context,
             client: widget.client,
             onConnected: _detectConnections);

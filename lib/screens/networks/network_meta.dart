@@ -124,7 +124,7 @@ const List<NetworkMeta> kNetworks = [
     description: 'Cloud messaging',
     botAlias: 'telegram',
     nameTag: 'tg',
-    available: false, // flip to true once the bridge actually ships
+    available: true, // flip to true once the bridge actually ships
   ),
 ];
 

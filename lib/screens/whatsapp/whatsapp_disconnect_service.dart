@@ -74,7 +74,12 @@ class WhatsAppDisconnectService {
 
   static Future<void> _sendLogoutCommand(Room botRoom) async {
     try {
-      await botRoom.sendTextEvent('!wa logout');
+      // Enterprise Fix: Send 'logout' directly. If we are in the DM,
+      // the bot intercepts this and officially unlinks the WhatsApp session.
+      await botRoom.sendTextEvent('logout');
+
+      // Give the bridge 2 seconds to process the unlink before we leave the room
+      await Future.delayed(const Duration(seconds: 2));
     } catch (e) {
       debugPrint('⚠️ Logout command failed, local cleanup proceeding: $e');
     }

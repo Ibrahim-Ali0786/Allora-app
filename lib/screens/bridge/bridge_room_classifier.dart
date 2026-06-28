@@ -5,6 +5,16 @@ import '../networks/network_meta.dart';
 class BridgeRoomClassifier {
   BridgeRoomClassifier._();
 
+  /// Returns the NetworkId this room belongs to, or null if it's a native Matrix room.
+  static NetworkId? getNetworkForRoom(Room room, {Client? client}) {
+    for (final network in NetworkId.values) {
+      if (isRoomForNetwork(room, network, client: client)) {
+        return network;
+      }
+    }
+    return null;
+  }
+
   /// Per-room classification cache. A portal room's network never changes
   /// after creation, so once we know the answer for a room id we never need
   /// to recompute it — in particular we never need to re-walk
