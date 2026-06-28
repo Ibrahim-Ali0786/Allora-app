@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: curly_braces_in_flow_control_structures, deprecated_member_use
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart';
@@ -83,6 +83,20 @@ class WhatsAppDisconnectService {
   static bool isWhatsAppRoom(Room room, {Client? client}) =>
       BridgeRoomClassifier.isRoomForNetwork(room, NetworkId.whatsapp,
           client: client);
+
+  /// Enterprise-grade check to strictly identify the management (bot) room
+  static bool isManagementRoom(Room room) {
+    // The Room object inherently holds a reference to its Client in the Matrix SDK
+    final userDomain = room.client.userID?.split(':').last;
+    if (userDomain == null) return false;
+
+    // Fetch the exact bot MXID from the central meta file
+    final botMxid =
+        metaFor(NetworkId.whatsapp).botMxid(userDomain).toLowerCase();
+
+    // Compare the room's direct chat ID to the expected bot MXID
+    return (room.directChatMatrixID ?? '').toLowerCase() == botMxid;
+  }
 
   static Future<bool> isWipePending() async {
     final prefs = await SharedPreferences.getInstance();

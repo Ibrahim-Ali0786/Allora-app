@@ -10,6 +10,7 @@ import 'whatsapp_disconnect_service.dart';
 import '../networks/network_connection_cache.dart';
 import '../bridge/bridge_room_classifier.dart';
 import 'package:http/http.dart' as http;
+import '../networks/network_meta.dart';
 
 // ─── BRAND COLORS ────────────────────────────────────────────────────────────
 const Color kBeeperBlue = Color(0xFF0052FF);
