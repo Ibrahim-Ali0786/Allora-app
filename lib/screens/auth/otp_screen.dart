@@ -4,12 +4,11 @@ import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pinput/pinput.dart';
 import '../chat_list_screen.dart';
-// ignore: library_prefixes
 
 class OtpScreen extends StatefulWidget {
   final Client client;
-  final String contact; // This can be an Email OR a Phone Number
-  final OtpType otpType; // Tells Supabase what kind of code we are verifying
+  final String contact;
+  final OtpType otpType;
 
   const OtpScreen({
     super.key,
@@ -24,15 +23,10 @@ class OtpScreen extends StatefulWidget {
 
 class _OtpScreenState extends State<OtpScreen> {
   bool _isLoading = false;
-  bool _isSuccess = false; // Controls the success animation state
+  bool _isSuccess = false;
 
-  // --- THE DETERMINISTIC MATRIX MIRROR ---
   Future<void> _syncMatrixAccount(String supabaseUserId) async {
-    // 1. Create a bulletproof Matrix username using their Supabase ID.
-    // This is much safer than using the phone number, as it works perfectly even if they logged in via Email!
     final matrixUsername = supabaseUserId.replaceAll('-', '').toLowerCase();
-
-    // 2. Generate an unbreakable, deterministic password using their ID
     final matrixPassword = "Allora_${matrixUsername.substring(0, 15)}!";
 
     try {
@@ -45,8 +39,6 @@ class _OtpScreenState extends State<OtpScreen> {
       debugPrint("Matrix Login Successful!");
     } catch (e) {
       debugPrint("User not found. Generating new Matrix account...");
-
-      // 👇 USE THE NATIVE REGISTER COMMAND HERE 👇
       try {
         await widget.client.register(
           username: matrixUsername,
@@ -56,16 +48,11 @@ class _OtpScreenState extends State<OtpScreen> {
       } catch (err) {
         debugPrint("Matrix Registration FAILED: $err");
       }
-      // 👆 ------------------------------------- 👆
     }
 
-    // 5. BOOTSTRAP END-TO-END ENCRYPTION (E2EE)
     if (widget.client.encryption != null) {
       debugPrint("Initializing Secure E2E Encryption...");
       try {
-        // The encryption API may not expose a direct bootstrapCrossSigning method
-        // on all versions of the Matrix client library. To remain compatible,
-        // perform a no-op await here while keeping the try/catch semantics.
         await Future<void>.value();
         debugPrint("Encryption bootstrap step skipped (no-op).");
       } catch (e) {
@@ -87,26 +74,19 @@ class _OtpScreenState extends State<OtpScreen> {
       );
 
       if (response.session != null && mounted) {
-        // 1. Verification passed! Trigger the success animation UI immediately.
         setState(() {
           _isLoading = false;
           _isSuccess = true;
         });
 
-        // 2. RUN MATRIX SYNC IN THE BACKGROUND!
-        // While the user watches the green checkmark animation, we securely register them to Matrix
         await _syncMatrixAccount(response.session!.user.id);
-
-        // 3. Ensure the animation stays on screen for at least a couple of seconds
-        // just in case the Matrix sync finished too fast (we want them to see the success checkmark!)
         await Future.delayed(const Duration(seconds: 2));
 
-        // 4. Drop them into the workspace fully authenticated to BOTH platforms
         if (mounted) {
+          // FIXED: ChatListScreen no longer takes a 'client' parameter
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(
-                builder: (_) => ChatListScreen(client: widget.client)),
+            MaterialPageRoute(builder: (_) => const ChatListScreen()),
             (route) => false,
           );
         }
@@ -149,42 +129,31 @@ class _OtpScreenState extends State<OtpScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // If verification is successful, show the animation
                 if (_isSuccess) ...[
                   TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 600), // Pop-in speed
+                    duration: const Duration(milliseconds: 600),
                     curve: Curves.elasticOut,
                     builder: (context, value, child) {
                       return Transform.scale(
                         scale: value,
-                        child: const Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 120, // Large, premium icon
-                        ),
+                        child: const Icon(Icons.check_circle,
+                            color: Colors.green, size: 120),
                       );
                     },
                   ),
                   const SizedBox(height: 24),
-                  Text(
-                    'Verification Successful',
-                    style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87),
-                  ),
+                  Text('Verification Successful',
+                      style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87)),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Securing your workspace...',
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
+                  const Text('Securing your workspace...',
+                      style: TextStyle(color: Colors.grey, fontSize: 16)),
                   const SizedBox(height: 40),
                   const CircularProgressIndicator(color: Colors.green),
-                ]
-
-                // Otherwise, show the normal input screen
-                else ...[
+                ] else ...[
                   Text('Enter code',
                       style: GoogleFonts.poppins(
                           fontSize: 28,
@@ -203,11 +172,14 @@ class _OtpScreenState extends State<OtpScreen> {
                       length: 6,
                       autofocus: true,
                       defaultPinTheme: defaultPinTheme,
-                      focusedPinTheme: defaultPinTheme.copyDecorationWith(
+                      // FIXED: Replaced copyDecorationWith to be compatible with all pinput versions
+                      focusedPinTheme: defaultPinTheme.copyWith(
+                          decoration: BoxDecoration(
                         border: Border.all(
                             color: Colors.blueAccent.shade700, width: 2),
+                        borderRadius: BorderRadius.circular(12),
                         color: Colors.white,
-                      ),
+                      )),
                       onCompleted: _verifyOtp,
                     ),
                 ],

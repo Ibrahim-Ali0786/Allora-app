@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'package:flutter/material.dart' hide Visibility;
 import 'package:flutter/services.dart';
@@ -5,14 +7,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:matrix/matrix.dart';
 import 'package:pinput/pinput.dart';
 
-import '../networks/network_connection_cache.dart';
-import '../networks/network_meta.dart';
-import '../bridge/bridge_room_classifier.dart';
+import './networks/network_connection_cache.dart';
+import './networks/network_meta.dart';
+import './bridge/bridge_room_classifier.dart';
 
 // ─── BRAND COLORS ────────────────────────────────────────────────────────────
 const Color kTelegramBlue = Color(0xFF29A9EA);
 
-// ─── COUNTRY LIST (Same as WhatsApp for consistency) ──────────────────────────
 final List<Map<String, String>> _allCountries = [
   {"name": "Australia", "code": "+61", "flag": "🇦🇺"},
   {"name": "Brazil", "code": "+55", "flag": "🇧🇷"},
@@ -20,15 +21,6 @@ final List<Map<String, String>> _allCountries = [
   {"name": "France", "code": "+33", "flag": "🇫🇷"},
   {"name": "Germany", "code": "+49", "flag": "🇩🇪"},
   {"name": "India", "code": "+91", "flag": "🇮🇳"},
-  {"name": "Indonesia", "code": "+62", "flag": "🇮🇩"},
-  {"name": "Italy", "code": "+39", "flag": "🇮🇹"},
-  {"name": "Mexico", "code": "+52", "flag": "🇲🇽"},
-  {"name": "Nigeria", "code": "+234", "flag": "🇳🇬"},
-  {"name": "Pakistan", "code": "+92", "flag": "🇵🇰"},
-  {"name": "Philippines", "code": "+63", "flag": "🇵🇭"},
-  {"name": "South Africa", "code": "+27", "flag": "🇿🇦"},
-  {"name": "United Arab Emirates", "code": "+971", "flag": "🇦🇪"},
-  {"name": "United Kingdom", "code": "+44", "flag": "🇬🇧"},
   {"name": "United States", "code": "+1", "flag": "🇺🇸"},
 ];
 
@@ -75,7 +67,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
   TelegramStep _currentStep = TelegramStep.phone;
   String? _sheetError;
   String _loadingMessage = 'Connecting to Telegram...';
-
   String _selectedCountryCode = "+91";
   String _selectedCountryFlag = "🇮🇳";
 
@@ -86,8 +77,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
     _activeSub?.cancel();
     super.dispose();
   }
-
-  // ─── PIPELINE LOGIC ────────────────────────────────────────────────────────
 
   Future<void> _ensureBotRoom() async {
     if (_botRoom != null) return;
@@ -112,8 +101,9 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
         _botRoom = widget.client.getRoomById(roomId);
         retries++;
       }
-      if (_botRoom == null)
+      if (_botRoom == null) {
         throw Exception("Could not connect to Telegram Bridge.");
+      }
     }
   }
 
@@ -122,19 +112,19 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
     _activeSub = widget.client.onTimelineEvent.stream.listen((Event event) {
       if (_botRoom == null ||
           event.roomId != _botRoom!.id ||
-          event.senderId == widget.client.userID) return;
+          event.senderId == widget.client.userID) {
+        return;
+      }
 
       final body =
           (event.content['body'] as String? ?? '').trim().toLowerCase();
       if (body.isEmpty) return;
 
-      // SUCCESS
       if (body.contains('logged in') || body.contains('success')) {
         HapticFeedback.heavyImpact();
         _handleSuccessfulConnection();
         return;
       }
-      // NEEDS CODE
       if (body.contains('code')) {
         HapticFeedback.mediumImpact();
         setState(() {
@@ -143,7 +133,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
         });
         return;
       }
-      // NEEDS 2FA PASSWORD
       if (body.contains('password') || body.contains('2fa')) {
         HapticFeedback.mediumImpact();
         setState(() {
@@ -152,7 +141,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
         });
         return;
       }
-      // ERROR
       if (body.contains('invalid') ||
           body.contains('error') ||
           body.contains('fail') ||
@@ -160,8 +148,9 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
         HapticFeedback.heavyImpact();
         setState(() {
           _sheetError = event.content['body'] as String?;
-          if (_currentStep == TelegramStep.loading)
+          if (_currentStep == TelegramStep.loading) {
             _currentStep = TelegramStep.phone;
+          }
         });
       }
     });
@@ -241,8 +230,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
     await Future.delayed(const Duration(milliseconds: 1500));
     if (mounted) Navigator.pop(context);
   }
-
-  // ─── UI HELPERS ────────────────────────────────────────────────────────────
 
   Future<Map<String, String>?> _showCountryPicker() {
     return showModalBottomSheet<Map<String, String>>(
@@ -335,6 +322,29 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // FIXED: Safely configured the Pinput theme manually to avoid older version copyWith errors
+    final defaultPinTheme = PinTheme(
+      width: 56,
+      height: 64,
+      textStyle: GoogleFonts.inter(
+          fontSize: 24, color: Colors.black87, fontWeight: FontWeight.w600),
+      decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white),
+    );
+
+    final focusedPinTheme = PinTheme(
+      width: 56,
+      height: 64,
+      textStyle: GoogleFonts.inter(
+          fontSize: 24, color: Colors.black87, fontWeight: FontWeight.w600),
+      decoration: BoxDecoration(
+          border: Border.all(color: kTelegramBlue, width: 2),
+          borderRadius: BorderRadius.circular(12),
+          color: Colors.white),
+    );
+
     return Container(
       margin: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       decoration: const BoxDecoration(
@@ -363,7 +373,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
                 ),
               ),
             ),
-
             if (_currentStep != TelegramStep.success) ...[
               const SizedBox(height: 12),
               Row(
@@ -397,7 +406,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
               ),
               const SizedBox(height: 32),
             ],
-
             if (_sheetError != null) ...[
               Container(
                 padding: const EdgeInsets.all(16),
@@ -421,8 +429,6 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
               ),
               const SizedBox(height: 24),
             ],
-
-            // ─── STEP: SUCCESS ───
             if (_currentStep == TelegramStep.success) ...[
               Center(
                 child: Column(
@@ -455,10 +461,7 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
                   ],
                 ),
               ),
-            ]
-
-            // ─── STEP: LOADING ───
-            else if (_currentStep == TelegramStep.loading) ...[
+            ] else if (_currentStep == TelegramStep.loading) ...[
               const Center(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 32.0),
@@ -471,10 +474,7 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
                       style: GoogleFonts.inter(
                           color: Colors.grey.shade600, fontSize: 14))),
               const SizedBox(height: 24),
-            ]
-
-            // ─── STEP: CODE INPUT ───
-            else if (_currentStep == TelegramStep.code) ...[
+            ] else if (_currentStep == TelegramStep.code) ...[
               Text('Enter Code',
                   style: GoogleFonts.inter(
                       color: Colors.black87,
@@ -489,34 +489,13 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
                 child: Pinput(
                   length: 5,
                   autofocus: true,
-                  defaultPinTheme: PinTheme(
-                    width: 56,
-                    height: 64,
-                    textStyle: GoogleFonts.inter(
-                        fontSize: 24,
-                        color: Colors.black87,
-                        fontWeight: FontWeight.w600),
-                    decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white),
-                  ),
-                  focusedPinTheme: PinTheme(
-                    width: 56,
-                    height: 64,
-                    decoration: BoxDecoration(
-                        border: Border.all(color: kTelegramBlue, width: 2),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white),
-                  ),
+                  defaultPinTheme: defaultPinTheme,
+                  focusedPinTheme: focusedPinTheme,
                   onCompleted: _submitCode,
                 ),
               ),
               const SizedBox(height: 32),
-            ]
-
-            // ─── STEP: PASSWORD (2FA) ───
-            else if (_currentStep == TelegramStep.password) ...[
+            ] else if (_currentStep == TelegramStep.password) ...[
               Text('Two-Step Verification',
                   style: GoogleFonts.inter(
                       color: Colors.black87,
@@ -547,10 +526,7 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
               ),
               const SizedBox(height: 32),
               _buildPillButton("Submit", _submitPassword),
-            ]
-
-            // ─── STEP: PHONE INPUT ───
-            else ...[
+            ] else ...[
               Text('Connect Telegram',
                   style: GoogleFonts.inter(
                       color: Colors.black87,

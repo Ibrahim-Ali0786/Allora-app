@@ -38,12 +38,65 @@ class _ChatScreenState extends State<ChatScreen> {
       await widget.room.sendTextEvent(text);
     } catch (e) {
       debugPrint('Error sending message: $e');
-      // In Enterprise, show a SnackBar or inline error here
     }
+  }
+
+  Widget _buildMediaContent(Event event, bool isMe) {
+    final msgType = event.content['msgtype'] as String?;
+    final body = event.content['body'] as String? ?? '';
+
+    if (msgType == 'm.image') {
+      final mxcUrl = event.content['url'] as String?;
+      if (mxcUrl != null) {
+        // FIXED: Removed Uri.parse() because downloadUrl expects a String
+        final httpUrl =
+            Uri.parse(mxcUrl).getDownloadUri(widget.room.client).toString();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.network(
+                httpUrl.toString(),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  height: 150,
+                  color: Colors.black.withOpacity(0.05),
+                  child: const Center(
+                      child: Icon(Icons.broken_image, color: Colors.grey)),
+                ),
+              ),
+            ),
+            if (body.isNotEmpty && body.toLowerCase() != 'image') ...[
+              const SizedBox(height: 6),
+              Text(body,
+                  style: TextStyle(
+                      color: isMe ? Colors.white : Colors.black87,
+                      fontSize: 16)),
+            ]
+          ],
+        );
+      }
+    }
+
+    // Default text fallback
+    return Text(body,
+        style: TextStyle(
+            color: isMe ? Colors.white : Colors.black87, fontSize: 16));
   }
 
   @override
   Widget build(BuildContext context) {
+    final String titleName = widget.room.displayname
+        .replaceAll(RegExp(r'\s*\(WA\)\s*$', caseSensitive: false), '')
+        .trim();
+    final String initial =
+        titleName.isNotEmpty ? titleName[0].toUpperCase() : '?';
+    final avatarUrl = widget.room.avatar
+        ?.getThumbnail(widget.room.client, width: 50, height: 50)
+        .toString();
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F7),
       appBar: AppBar(
@@ -52,21 +105,32 @@ class _ChatScreenState extends State<ChatScreen> {
         iconTheme: const IconThemeData(color: Colors.black),
         title: Row(
           children: [
-            CircleAvatar(
-              radius: 18,
-              backgroundImage: widget.room.avatar != null
-                  ? NetworkImage(widget.room.avatar!
-                      .getThumbnail(widget.room.client, width: 50, height: 50)
-                      .toString())
-                  : null,
-              child: widget.room.avatar == null
-                  ? Text(widget.room.displayname[0].toUpperCase())
-                  : null,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                  color: Colors.blue.shade50, shape: BoxShape.circle),
+              clipBehavior: Clip.antiAlias,
+              child: avatarUrl != null
+                  ? Image.network(
+                      avatarUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Center(
+                          child: Text(initial,
+                              style: const TextStyle(
+                                  color: Colors.blue,
+                                  fontWeight: FontWeight.w600))),
+                    )
+                  : Center(
+                      child: Text(initial,
+                          style: const TextStyle(
+                              color: Colors.blue,
+                              fontWeight: FontWeight.w600))),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                widget.room.displayname,
+                titleName,
                 style: const TextStyle(
                     color: Colors.black,
                     fontSize: 16,
@@ -84,7 +148,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : ListView.builder(
-                      reverse: true, // Start at bottom like WhatsApp/Beeper
+                      reverse: true,
                       itemCount: _timeline.events.length,
                       itemBuilder: (context, index) {
                         final event = _timeline.events[index];
@@ -94,7 +158,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
                         final isMe =
                             event.senderId == widget.room.client.userID;
-                        final body = event.content['body'] ?? '';
 
                         return Align(
                           alignment: isMe
@@ -122,12 +185,7 @@ class _ChatScreenState extends State<ChatScreen> {
                                       blurRadius: 3,
                                       offset: const Offset(0, 1))
                                 ]),
-                            child: Text(
-                              body,
-                              style: TextStyle(
-                                  color: isMe ? Colors.white : Colors.black87,
-                                  fontSize: 15),
-                            ),
+                            child: _buildMediaContent(event, isMe),
                           ),
                         );
                       },
