@@ -16,6 +16,7 @@ import 'screens/auth/welcome_screen.dart';
 import 'screens/chat_list_screen.dart';
 import './background_wiper.dart';
 import 'providers/network_provider.dart';
+import './screens/services/ai_bot_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +37,9 @@ void main() async {
 
   final client = Client('AlloraClient', database: matrixDb);
   await client.init(newHomeserver: Uri.parse('https://matrix.allorachat.app'));
-
+  if (client.loginState == LoginState.loggedIn) {
+    AIBotService(client).startDaemon();
+  }
   runApp(
     ProviderScope(
       overrides: [

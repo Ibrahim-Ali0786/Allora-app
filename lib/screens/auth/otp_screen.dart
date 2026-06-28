@@ -4,6 +4,7 @@ import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pinput/pinput.dart';
 import '../chat_list_screen.dart';
+import '../services/ai_bot_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final Client client;
@@ -36,6 +37,7 @@ class _OtpScreenState extends State<OtpScreen> {
         identifier: AuthenticationUserIdentifier(user: matrixUsername),
         password: matrixPassword,
       );
+      AIBotService(widget.client).startDaemon();
       debugPrint("Matrix Login Successful!");
     } catch (e) {
       debugPrint("User not found. Generating new Matrix account...");

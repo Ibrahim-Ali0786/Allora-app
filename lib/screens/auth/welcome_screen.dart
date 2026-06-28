@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:matrix/matrix.dart';
+
+// Ensure these point to your correct auth files
 import 'email_screen.dart';
-import 'signup_screen.dart'; // Make sure this points to your new signup screen
+import 'signup_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   final Client client;
@@ -20,8 +22,7 @@ class WelcomeScreen extends StatelessWidget {
               width: double.infinity,
               decoration: const BoxDecoration(
                 image: DecorationImage(
-                  image: AssetImage(
-                      'assets/images/allora_hero.png'), // Ensure your image path is correct
+                  image: AssetImage('assets/images/allora_hero.png'),
                   fit: BoxFit.cover,
                   alignment: Alignment.center,
                 ),
@@ -66,8 +67,7 @@ class WelcomeScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(
-                      height: 32), // Adjusted spacing for a cleaner look
+                  const SizedBox(height: 32),
 
                   // --- CREATE ACCOUNT TEXT ---
                   Row(
@@ -79,7 +79,6 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                       GestureDetector(
                         onTap: () {
-                          // Routes directly to the Registration Form
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -111,8 +110,7 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                       children: [
                         const TextSpan(
-                          text: 'By continuing, you agree to our ',
-                        ),
+                            text: 'By continuing, you agree to our '),
                         TextSpan(
                           text: 'terms of use',
                           style: TextStyle(
