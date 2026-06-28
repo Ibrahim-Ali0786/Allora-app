@@ -1,0 +1,31 @@
+ allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = "../build"
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+
+// 1. REGISTER THE OVERRIDE FIRST (Safe for Gradle 8+)
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            project.android {
+                compileSdk = 36
+            }
+        }
+    }
+}
+
+// 2. TRIGGER THE EVALUATION SECOND
+subprojects {
+    project.evaluationDependsOn(":app")
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
