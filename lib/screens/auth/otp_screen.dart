@@ -3,8 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pinput/pinput.dart';
-import '../chat_list_screen.dart';
-import '../services/ai_bot_service.dart';
+import '../../features/home_gate.dart';
+import '../../features/privacy/app_lock.dart';
 
 class OtpScreen extends StatefulWidget {
   final Client client;
@@ -37,7 +37,6 @@ class _OtpScreenState extends State<OtpScreen> {
         identifier: AuthenticationUserIdentifier(user: matrixUsername),
         password: matrixPassword,
       );
-      AIBotService(widget.client).startDaemon();
       debugPrint("Matrix Login Successful!");
     } catch (e) {
       debugPrint("User not found. Generating new Matrix account...");
@@ -85,10 +84,12 @@ class _OtpScreenState extends State<OtpScreen> {
         await Future.delayed(const Duration(seconds: 2));
 
         if (mounted) {
-          // FIXED: ChatListScreen no longer takes a 'client' parameter
+          // Connect-first: HomeGate shows the connect screen until a
+          // platform is linked, then the chat list. Wrapped in the app lock.
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (_) => const ChatListScreen()),
+            MaterialPageRoute(
+                builder: (_) => const LockGate(child: HomeGate())),
             (route) => false,
           );
         }

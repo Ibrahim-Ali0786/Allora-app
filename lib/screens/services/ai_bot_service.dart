@@ -1,75 +1,16 @@
-import 'dart:async';
-import 'package:flutter/foundation.dart';
-import 'package:matrix/matrix.dart';
-
-class AIBotService {
-  final Client _client;
-  StreamSubscription? _timelineSubscription;
-  final Set<String> _processedEventIds = {};
-
-  AIBotService(this._client);
-
-  void startDaemon() {
-    if (_timelineSubscription != null) return;
-
-    debugPrint('🤖 [AI Bot Engine] Initializing contextual matrix listener...');
-    _timelineSubscription =
-        _client.onTimelineEvent.stream.listen(_handleIncomingEvent);
-  }
-
-  void stopDaemon() {
-    _timelineSubscription?.cancel();
-    _timelineSubscription = null;
-    debugPrint('🤖 [AI Bot Engine] Stopped daemon cleanup process.');
-  }
-
-  Future<void> _handleIncomingEvent(Event event) async {
-    // Basic verification filters to protect stream integrity
-    if (event.type != EventTypes.Message) return;
-    if (event.senderId == _client.userID)
-      return; // Ignore self reflection loops
-    if (_processedEventIds.contains(event.eventId)) return;
-
-    _processedEventIds.add(event.eventId);
-
-    final String body = event.content['body']?.toString() ?? '';
-    if (body.trim().isEmpty) return;
-
-    final room = _client.getRoomById(event.roomId);
-    if (room == null) return;
-
-    // Simulate thinking context frame
-    await room.setTyping(true, timeout: 2000);
-    await Future.delayed(const Duration(milliseconds: 1500));
-
-    // Generate response text block based on structural query mappings
-    final aiResponse = _generateContextualReply(body, event.senderId);
-
-    try {
-      await room.sendTextEvent(aiResponse);
-    } catch (e) {
-      debugPrint(
-          '🤖 [AI Bot Error] Failed to commit remote event sequence: $e');
-    } finally {
-      await room.setTyping(false);
-    }
-  }
-
-  String _generateContextualReply(String incomingMessage, String sender) {
-    final text = incomingMessage.toLowerCase();
-
-    // Production Rule Mapping Configuration Matrix
-    if (text.contains('hello') || text.contains('hi') || text.contains('hey')) {
-      return 'Hello! This is Allora AI. I managed this chat routing space for you. How can I assist you right now?';
-    }
-    if (text.contains('status') || text.contains('running')) {
-      return 'System diagnostics confirm that all matrix infrastructure pipelines are healthy and operating under nominal load metrics.';
-    }
-    if (text.contains('help')) {
-      return 'Available Commands: \n• status - View connection matrices \n• info - Check engine deployment specs';
-    }
-
-    // Fallback automated LLM context emulation state
-    return 'Thank you for your message. Allora AI processed your inquiry: "$incomingMessage". Our automated routing stack is sorting this transaction context.';
-  }
-}
+/// REMOVED in v2.
+///
+/// The old `AIBotService` daemon listened to *every* timeline event and
+/// auto-replied **as the user** in **every room** — including bridged
+/// WhatsApp/Telegram chats — with canned rule-based text. That is a serious
+/// correctness and privacy bug, not an assistant.
+///
+/// Allora AI now lives in:
+///   * `lib/data/services/ai_service.dart`  — server-backed AI client
+///     (Supabase Edge Function; no keys in the app, no fake regex replies)
+///   * `lib/features/ai/`                   — assistant UI (compose sheet,
+///     smart replies, Allora AI chat)
+///
+/// This file is intentionally empty and no longer imported anywhere; it is
+/// kept only because the deployment sandbox forbids deleting files.
+library removed_ai_bot_service;

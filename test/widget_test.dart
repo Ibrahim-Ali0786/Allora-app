@@ -1,32 +1,38 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:allora/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp() as Widget);
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  setUpAll(() {
+    // Never touch fonts (asset or network) in tests.
+    GoogleFonts.config.allowRuntimeFetching = false;
+    AppTheme.useGoogleFonts = false;
   });
-}
 
-class MyApp {
-  const MyApp();
+  testWidgets('themes build and expose Allora design tokens', (tester) async {
+    for (final theme in [AppTheme.light(), AppTheme.dark(accentIndex: 2)]) {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: theme,
+          home: Builder(
+            builder: (context) {
+              final c = context.allora;
+              return Scaffold(
+                body: Column(
+                  children: [
+                    Text('token check',
+                        style: TextStyle(color: c.text)),
+                    FilledButton(onPressed: () {}, child: const Text('ok')),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      expect(find.text('token check'), findsOneWidget);
+      expect(theme.extension<AlloraColors>(), isNotNull);
+    }
+  });
 }

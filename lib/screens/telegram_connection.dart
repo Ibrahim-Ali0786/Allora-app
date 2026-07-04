@@ -178,7 +178,7 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
       }
       final sanitizedNumber = '+$codeOnly$cleanInput';
 
-      await _botRoom!.sendTextEvent('login $sanitizedNumber');
+      await _botRoom!.sendTextEvent('login phone $sanitizedNumber');
     } catch (e) {
       setState(() {
         _currentStep = TelegramStep.phone;

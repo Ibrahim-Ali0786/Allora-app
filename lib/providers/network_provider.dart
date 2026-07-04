@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matrix/matrix.dart';
-import '../screens/networks/network_meta.dart';
-import '../screens/networks/network_connection_cache.dart';
-import '../screens/whatsapp/whatsapp_disconnect_service.dart';
 
-// Provides global access to the Matrix client
+import '../data/services/room_wipe_service.dart';
+import '../screens/networks/network_connection_cache.dart';
+import '../screens/networks/network_meta.dart';
+
+/// Global Matrix client (overridden in main() with the real instance).
 final matrixClientProvider =
     Provider<Client>((ref) => throw UnimplementedError());
 
@@ -16,11 +17,12 @@ class NetworkAccount {
   final String? accountLabel;
   final String? lastSynced;
 
-  const NetworkAccount(
-      {required this.meta,
-      required this.status,
-      this.accountLabel,
-      this.lastSynced});
+  const NetworkAccount({
+    required this.meta,
+    required this.status,
+    this.accountLabel,
+    this.lastSynced,
+  });
 }
 
 class NetworkHubState {
@@ -28,15 +30,17 @@ class NetworkHubState {
   final bool isGlobalLoading;
   final bool isWipePending;
 
-  const NetworkHubState(
-      {required this.networks,
-      this.isGlobalLoading = false,
-      this.isWipePending = false});
+  const NetworkHubState({
+    required this.networks,
+    this.isGlobalLoading = false,
+    this.isWipePending = false,
+  });
 
-  NetworkHubState copyWith(
-      {List<NetworkAccount>? networks,
-      bool? isGlobalLoading,
-      bool? isWipePending}) {
+  NetworkHubState copyWith({
+    List<NetworkAccount>? networks,
+    bool? isGlobalLoading,
+    bool? isWipePending,
+  }) {
     return NetworkHubState(
       networks: networks ?? this.networks,
       isGlobalLoading: isGlobalLoading ?? this.isGlobalLoading,
@@ -47,26 +51,31 @@ class NetworkHubState {
 
 class NetworkNotifier extends StateNotifier<NetworkHubState> {
   NetworkNotifier() : super(const NetworkHubState(networks: [])) {
-    _init();
-  }
-
-  void _init() {
     refreshCache();
-    // Listen to OS wiping state
-    WhatsAppDisconnectService.isWipePendingNotifier.addListener(_syncWipeState);
+    NetworkConnectionCache.notifier.addListener(refreshCache);
+    RoomWipeService.pending.addListener(_syncWipeState);
     _syncWipeState();
   }
 
+  @override
+  void dispose() {
+    NetworkConnectionCache.notifier.removeListener(refreshCache);
+    RoomWipeService.pending.removeListener(_syncWipeState);
+    super.dispose();
+  }
+
   void _syncWipeState() {
+    if (!mounted) return;
     state = state.copyWith(
-        isWipePending: WhatsAppDisconnectService.isWipePendingNotifier.value);
+        isWipePending: RoomWipeService.pending.value.isNotEmpty);
   }
 
   void refreshCache() {
+    if (!mounted) return;
     final networks = kNetworks.map((meta) {
-      if (!meta.available)
-        // ignore: curly_braces_in_flow_control_structures
+      if (!meta.available) {
         return NetworkAccount(meta: meta, status: NetworkStatus.comingSoon);
+      }
       final cached = NetworkConnectionCache.get(meta.id);
       return NetworkAccount(
         meta: meta,
@@ -86,6 +95,5 @@ class NetworkNotifier extends StateNotifier<NetworkHubState> {
 }
 
 final networkHubProvider =
-    StateNotifierProvider<NetworkNotifier, NetworkHubState>((ref) {
-  return NetworkNotifier();
-});
+    StateNotifierProvider<NetworkNotifier, NetworkHubState>(
+        (ref) => NetworkNotifier());

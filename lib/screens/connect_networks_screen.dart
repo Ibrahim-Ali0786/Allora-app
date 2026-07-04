@@ -12,8 +12,10 @@ import './twitter_connection.dart';
 import './auth/welcome_screen.dart';
 import './whatsapp/whatsapp_connection.dart';
 import './instagram_connection.dart';
-import './whatsapp/whatsapp_disconnect.dart';
-import './whatsapp/whatsapp_disconnect_service.dart';
+import '../data/services/account_lifecycle.dart';
+import '../data/services/connection_manager.dart';
+import '../data/services/hidden_rooms_store.dart';
+import './networks/network_account_sheet.dart';
 import './networks/network_meta.dart';
 import './networks/network_connection_cache.dart';
 import './bridge/bridge_room_classifier.dart';
@@ -87,48 +89,10 @@ class _ConnectNetworksScreenState extends ConsumerState<ConnectNetworksScreen> {
     if ((p - _collapse).abs() > 0.01) setState(() => _collapse = p);
   }
 
-  // Live probe (kept in UI layer as it manipulates stream subscriptions)
+  /// Single multiplexed probe via the ConnectionManager (no per-network
+  /// stream subscriptions leaking out of the UI layer anymore).
   Future<void> _detectConnections() async {
-    final networks = ref.read(networkHubProvider).networks;
-    for (int i = 0; i < networks.length; i++) {
-      final net = networks[i];
-      if (net.status == NetworkStatus.comingSoon) continue;
-
-      final cached = NetworkConnectionCache.get(net.meta.id);
-      if (cached.autoDetectSuppressed) continue;
-
-      Room? botRoom;
-      for (final r in widget.client.rooms) {
-        if (r.displayname.toLowerCase().contains(net.meta.botAlias)) {
-          botRoom = r;
-          break;
-        }
-      }
-      if (botRoom == null) continue;
-
-      StreamSubscription? sub;
-      sub = widget.client.onTimelineEvent.stream.listen((event) {
-        if (event.roomId != botRoom!.id ||
-            event.senderId == widget.client.userID) {
-          return;
-        }
-        final body = (event.content['body'] as String? ?? '').trim();
-        final result = _parseListLogins(body);
-        if (result == null) return;
-
-        if (result.isLoggedIn) {
-          NetworkConnectionCache.markConnected(net.meta.id,
-              accountLabel: result.accountLabel, lastSynced: 'Active');
-        } else if (!NetworkConnectionCache.get(net.meta.id)
-            .autoDetectSuppressed) {
-          NetworkConnectionCache.markDisconnected(net.meta.id, suppressMs: 0);
-        }
-        sub?.cancel();
-      });
-
-      await botRoom.sendTextEvent('list-logins');
-      Future.delayed(const Duration(seconds: 8), () => sub?.cancel());
-    }
+    await ref.read(connectionManagerProvider.notifier).probeNetworks();
   }
 
   void _confirmLogout() {
@@ -179,11 +143,8 @@ class _ConnectNetworksScreenState extends ConsumerState<ConnectNetworksScreen> {
                           .read(networkHubProvider.notifier)
                           .setGlobalLoading(true);
                       try {
-                        for (final id in NetworkId.values) {
-                          await NetworkConnectionCache.markDisconnected(id);
-                        }
-                        await widget.client.logout();
-                        await Supabase.instance.client.auth.signOut();
+                        await AccountLifecycleService.logoutAllora(
+                            widget.client);
                         if (mounted) {
                           Navigator.of(context).pushAndRemoveUntil(
                               MaterialPageRoute(
@@ -215,72 +176,71 @@ class _ConnectNetworksScreenState extends ConsumerState<ConnectNetworksScreen> {
   }
 
   void _openConnectFlow(NetworkAccount net) {
+    // A single success handler for EVERY network: force-mark it connected
+    // right away (some connect sheets never did, which is why the hub never
+    // flipped and onboarding never advanced), refresh, then — in onboarding
+    // — jump to the chat list once the sheet has closed.
+    void onConnected() {
+      // Force-mark connected immediately. Several connect sheets never did,
+      // which is why the hub never flipped and the app never advanced to the
+      // chat list. HomeGate watches the connected state and swaps this screen
+      // for the inbox on its own.
+      NetworkConnectionCache.markConnected(net.meta.id, force: true);
+      // Reconnecting un-hides anything we hid when it was disconnected.
+      HiddenRoomsStore.clear(net.meta.id);
+      if (net.meta.id == NetworkId.whatsapp) {
+        widget.onWhatsAppConnected?.call();
+      }
+      ref.read(networkHubProvider.notifier).refreshCache();
+      _detectConnections();
+    }
+
     switch (net.meta.displayName) {
       case 'WhatsApp':
         showWhatsAppConnectSheet(
-            context: context,
-            client: widget.client,
-            onConnected: () {
-              widget.onWhatsAppConnected?.call();
-              _detectConnections();
-            });
+            context: context, client: widget.client, onConnected: onConnected);
         break;
       case 'Instagram':
         showInstagramConnectSheet(
-            context: context,
-            client: widget.client,
-            onConnected: _detectConnections);
+            context: context, client: widget.client, onConnected: onConnected);
         break;
       case 'Messenger':
         showMessengerConnectSheet(
-            context: context,
-            client: widget.client,
-            onConnected: _detectConnections);
+            context: context, client: widget.client, onConnected: onConnected);
         break;
       case 'Discord':
         showDiscordConnectSheet(
-            context: context,
-            client: widget.client,
-            onConnected: _detectConnections);
+            context: context, client: widget.client, onConnected: onConnected);
         break;
       case 'Slack':
         showSlackConnectSheet(
-            context: context,
-            client: widget.client,
-            onConnected: _detectConnections);
+            context: context, client: widget.client, onConnected: onConnected);
         break;
       case 'X':
         showTwitterConnectSheet(
-            context: context,
-            client: widget.client,
-            onConnected: _detectConnections);
+            context: context, client: widget.client, onConnected: onConnected);
         break;
-
-      case 'Telegram': // <-- ADDED TELEGRAM CASE
+      case 'Telegram':
         showTelegramConnectSheet(
-            context: context,
-            client: widget.client,
-            onConnected: _detectConnections);
+            context: context, client: widget.client, onConnected: onConnected);
         break;
     }
   }
 
   void _openDetailSheet(NetworkAccount net) {
-    if (net.meta.displayName == 'WhatsApp') {
-      showWhatsAppAccountDetailSheet(
-        context: context,
-        client: widget.client,
-        brandColor: net.meta.brandColor,
-        asset: net.meta.asset,
-        accountLabel: net.accountLabel ?? 'Connected',
-        lastSynced: net.lastSynced ?? 'Active',
-        onGlobalLoading: (v) =>
-            ref.read(networkHubProvider.notifier).setGlobalLoading(v),
-        onDisconnected: () => widget.onWhatsAppDisconnected
-            ?.call(), // Service triggers OS & UI automatically now!
-      );
-      return;
-    }
+    showNetworkAccountSheet(
+      context: context,
+      client: widget.client,
+      meta: net.meta,
+      accountLabel: net.accountLabel,
+      lastSynced: net.lastSynced,
+      onDisconnected: () {
+        ref.read(networkHubProvider.notifier).refreshCache();
+        if (net.meta.id == NetworkId.whatsapp) {
+          widget.onWhatsAppDisconnected?.call();
+        }
+      },
+    );
   }
 
   @override
@@ -416,10 +376,13 @@ class _TopBarDelegate extends SliverPersistentHeaderDelegate {
               right: 0,
               height: _comp,
               child: Row(children: [
-                IconButton(
-                    icon: const Icon(Icons.arrow_back,
-                        color: _T.onSurface, size: 23),
-                    onPressed: onBack),
+                if (Navigator.of(ctx).canPop())
+                  IconButton(
+                      icon: const Icon(Icons.arrow_back,
+                          color: _T.onSurface, size: 23),
+                      onPressed: onBack)
+                else
+                  const SizedBox(width: 12),
                 Expanded(
                     child: Opacity(
                         opacity: c,
@@ -614,28 +577,4 @@ class _Status extends StatelessWidget {
             style: TextStyle(fontSize: 13, color: _T.onSurfaceMuted));
     }
   }
-}
-
-class _LoginResult {
-  final bool isLoggedIn;
-  final String? accountLabel;
-  _LoginResult({required this.isLoggedIn, this.accountLabel});
-}
-
-_LoginResult? _parseListLogins(String body) {
-  final lower = body.toLowerCase();
-  if (lower.contains('not logged in') ||
-      lower.contains("you're not logged into") ||
-      lower.contains('no logins')) {
-    return _LoginResult(isLoggedIn: false);
-  }
-  if (lower.contains('list of logins') ||
-      lower.contains('logged in as') ||
-      RegExp(r'^\s*[*\-•]\s*\S+', multiLine: true).hasMatch(body)) {
-    final phone = RegExp(r'\+\d{6,15}').firstMatch(body);
-    final handle = RegExp(r'@[\w.\-]+').firstMatch(body);
-    return _LoginResult(
-        isLoggedIn: true, accountLabel: phone?.group(0) ?? handle?.group(0));
-  }
-  return null;
 }

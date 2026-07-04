@@ -35,6 +35,13 @@ class NetworkMeta {
   /// that knows about them.
   final List<String> extraNameSignals;
 
+  /// The `protocol.id` values a mautrix/matrix bridge advertises in its
+  /// `m.bridge` (and `uk.half-shot.bridge`) room-state event. This is the
+  /// single most reliable portal signal — it doesn't depend on room names,
+  /// aliases or which members happen to be loaded. e.g. mautrix-whatsapp
+  /// stamps `protocol: { id: "whatsapp" }` on every portal, groups included.
+  final List<String> bridgeProtocols;
+
   const NetworkMeta({
     required this.id,
     required this.displayName,
@@ -46,6 +53,7 @@ class NetworkMeta {
     this.icon,
     this.available = true,
     this.extraNameSignals = const [],
+    this.bridgeProtocols = const [],
   });
 
   /// The bridge bot's own Matrix ID on [userDomain], e.g.
@@ -70,6 +78,7 @@ const List<NetworkMeta> kNetworks = [
     botAlias: 'whatsapp',
     nameTag: 'wa',
     extraNameSignals: ['status broadcast'],
+    bridgeProtocols: ['whatsapp'],
   ),
   NetworkMeta(
     id: NetworkId.instagram,
@@ -79,6 +88,7 @@ const List<NetworkMeta> kNetworks = [
     description: 'Direct messages',
     botAlias: 'instagram',
     nameTag: 'ig',
+    bridgeProtocols: ['instagram', 'instagramgo'],
   ),
   NetworkMeta(
     id: NetworkId.messenger,
@@ -88,6 +98,7 @@ const List<NetworkMeta> kNetworks = [
     description: 'Facebook conversations',
     botAlias: 'messenger',
     nameTag: 'fb',
+    bridgeProtocols: ['facebook', 'messenger', 'facebookgo'],
   ),
   NetworkMeta(
     id: NetworkId.discord,
@@ -97,6 +108,7 @@ const List<NetworkMeta> kNetworks = [
     description: 'Servers and direct messages',
     botAlias: 'discord',
     nameTag: 'discord',
+    bridgeProtocols: ['discord', 'discordgo'],
   ),
   NetworkMeta(
     id: NetworkId.x,
@@ -106,6 +118,7 @@ const List<NetworkMeta> kNetworks = [
     description: 'Posts and direct messages',
     botAlias: 'twitter',
     nameTag: 'x',
+    bridgeProtocols: ['twitter', 'x'],
   ),
   NetworkMeta(
     id: NetworkId.slack,
@@ -115,6 +128,7 @@ const List<NetworkMeta> kNetworks = [
     description: 'Workspace channels',
     botAlias: 'slack',
     nameTag: 'slack',
+    bridgeProtocols: ['slack', 'slackgo'],
   ),
   NetworkMeta(
     id: NetworkId.telegram,
@@ -125,7 +139,18 @@ const List<NetworkMeta> kNetworks = [
     botAlias: 'telegram',
     nameTag: 'tg',
     available: true, // flip to true once the bridge actually ships
+    bridgeProtocols: ['telegram'],
   ),
 ];
 
 NetworkMeta metaFor(NetworkId id) => kNetworks.firstWhere((n) => n.id == id);
+
+/// Maps a bridge's advertised `protocol.id` (from an `m.bridge` state event)
+/// to the Allora network it belongs to, or null if unknown/ambiguous.
+NetworkId? networkForBridgeProtocol(String protocolId) {
+  final id = protocolId.toLowerCase().trim();
+  for (final n in kNetworks) {
+    if (n.bridgeProtocols.contains(id)) return n.id;
+  }
+  return null;
+}
