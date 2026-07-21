@@ -3,4 +3,4 @@
 /// guaranteeing there is exactly one implementation.
 library;
 
-export '../features/chat_list/chat_list_screen.dart' show ChatListScreen;
+export '../../features/chat_list/chat_list_screen.dart' show ChatListScreen;

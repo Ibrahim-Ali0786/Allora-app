@@ -10,7 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/allora_avatar.dart';
 import '../../data/settings/app_settings.dart';
 import '../../providers/network_provider.dart';
-import '../../screens/connect_networks_screen.dart';
+import '../../screens/connection_screen/connect_networks_screen.dart';
 import '../settings/ai_settings_screen.dart';
 import '../settings/privacy_settings_screen.dart';
 import '../settings/security_settings_screen.dart';
@@ -59,8 +59,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  String get _username =>
-      client.userID?.split(':').first.replaceAll('@', '') ?? 'You';
+  /// A clean, email-derived handle (e.g. "ibrahimtin0786@gmail.com" →
+  /// "ibrahimtin0786"). Unique per account; falls back to the Matrix id.
+  String get _username {
+    final email = Supabase.instance.client.auth.currentUser?.email;
+    if (email != null && email.contains('@')) {
+      final local = email.split('@').first.toLowerCase();
+      final cleaned = local.replaceAll(RegExp(r'[^a-z0-9._-]'), '');
+      if (cleaned.isNotEmpty) return cleaned;
+    }
+    return client.userID?.split(':').first.replaceAll('@', '') ?? 'user';
+  }
 
   Future<void> _changeAvatar() async {
     XFile? file;
@@ -161,9 +170,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final user = Supabase.instance.client.auth.currentUser;
     final name = settings.displayName.isNotEmpty
         ? settings.displayName
-        : (_displayName?.isNotEmpty ?? false)
-            ? _displayName!
-            : _username;
+        : _username;
 
     return Scaffold(
       backgroundColor: c.canvas,
@@ -258,6 +265,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   Text('@$_username',
                       style: TextStyle(fontSize: 13.5, color: c.textSecondary)),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: c.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.verified_rounded, size: 14, color: c.accent),
+                        const SizedBox(width: 5),
+                        Text('Allora · Free',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: c.accent)),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -288,13 +316,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
               child: Column(
                 children: [
-                  _sectionCard(context, 'ACCOUNT', [
+                  _sectionCard(context, 'ACCOUNT DETAILS', [
+                    _infoRow(Icons.person_outline_rounded, 'Name', name),
                     if (user?.email != null)
-                      _infoRow(Icons.email_rounded, 'Email', user!.email!),
-                    if (user?.phone != null && user!.phone!.isNotEmpty)
-                      _infoRow(Icons.phone_rounded, 'Phone', user.phone!),
-                    _infoRow(Icons.dns_rounded, 'Homeserver',
-                        client.homeserver?.host ?? 'allorachat.app'),
+                      _infoRow(Icons.mail_outline_rounded, 'Email account',
+                          user!.email!),
+                    _infoRow(
+                        Icons.alternate_email_rounded, 'Username', _username),
                   ]),
                   const SizedBox(height: 14),
                   _statGrid(context, connectedCount, settings),

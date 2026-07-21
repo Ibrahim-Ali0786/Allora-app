@@ -13,13 +13,14 @@ import '../../data/services/ai_service.dart';
 import '../../data/settings/app_settings.dart';
 import '../../providers/network_provider.dart';
 import '../../screens/auth/welcome_screen.dart';
-import '../../screens/connect_networks_screen.dart';
+import '../../screens/connection_screen/connect_networks_screen.dart';
 import '../profile/profile_screen.dart';
 import '../labels/labels_management_screen.dart';
 import 'accessibility_settings_screen.dart';
 import 'ai_settings_screen.dart';
 import 'appearance_settings_screen.dart';
 import 'diagnostics_screen.dart';
+import 'floating_chat_settings_screen.dart';
 import 'labs_settings_screen.dart';
 import 'privacy_settings_screen.dart';
 import 'scheduled_messages_screen.dart';
@@ -87,6 +88,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               context,
               MaterialPageRoute(
                   builder: (_) => const AccessibilitySettingsScreen())),
+        ),
+        _Item(
+          icon: Icons.bubble_chart_rounded,
+          color: const Color(0xFF7C5CFC),
+          title: 'Floating chat',
+          subtitle: 'Chat bubble over other apps',
+          keywords: 'floating chat bubble overlay heads over apps',
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => const FloatingChatSettingsScreen())),
         ),
       ]),
       _SettingsSection('Privacy & Security', [

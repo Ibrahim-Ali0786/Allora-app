@@ -15,7 +15,7 @@ import '../../data/settings/app_settings.dart';
 import '../../data/settings/labels.dart';
 import '../labels/labels_management_screen.dart';
 import '../../providers/network_provider.dart';
-import '../../screens/connect_networks_screen.dart';
+import '../../screens/connection_screen/connect_networks_screen.dart';
 import '../ai/ai_chat_screen.dart';
 import '../chat/chat_screen.dart';
 import '../chat/widgets/disappearing_sheet.dart';
@@ -290,8 +290,13 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
     final settings = ref.read(settingsProvider.notifier);
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (ctx) => SafeArea(
-        child: Column(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(ctx).size.height * 0.72),
+          child: SingleChildScrollView(
+            child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
@@ -397,6 +402,8 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
             ),
             const SizedBox(height: 8),
           ],
+        ),
+          ),
         ),
       ),
     );

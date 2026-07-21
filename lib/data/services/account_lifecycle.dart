@@ -1,13 +1,18 @@
 // ignore_for_file: deprecated_member_use
 import 'package:flutter/foundation.dart';
 import 'package:matrix/matrix.dart';
+import 'package:flutter/painting.dart' show PaintingBinding;
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../core/utils/app_keys.dart';
 
 import '../../screens/bridge/bridge_room_classifier.dart';
 import '../../screens/networks/network_connection_cache.dart';
 import '../../screens/networks/network_meta.dart';
 import 'connection_manager.dart';
+import 'disappearing_message_service.dart';
 import 'hidden_rooms_store.dart';
+import 'scheduled_message_service.dart';
 import 'room_wipe_service.dart';
 
 /// Result of a network disconnect, so the UI can tell the user the truth
@@ -68,16 +73,21 @@ class AccountLifecycleService {
     var remoteLogoutSent = false;
     if (botRoom != null) {
       try {
-        // mautrix accepts a bare `logout` in the management DM. Newer
-        // (bridgev2) builds also accept `logout all`; we send the plain
-        // form first, then a best-effort `logout all` a beat later so a
-        // multi-login setup is fully cleared. Failures are non-fatal.
-        await botRoom.sendTextEvent('logout');
-        remoteLogoutSent = true;
-        await Future.delayed(const Duration(seconds: 2));
-        try {
-          await botRoom.sendTextEvent('logout all');
-        } catch (_) {}
+        // Send the platform's revocation sequence (see
+        // NetworkMeta.logoutCommands / the per-platform disconnect
+        // services). First command marks success; later ones are
+        // best-effort extras for multi-login bridge builds.
+        var first = true;
+        for (final command in meta.logoutCommands) {
+          try {
+            await botRoom.sendTextEvent(command);
+            if (first) remoteLogoutSent = true;
+          } catch (e) {
+            if (first) rethrow;
+          }
+          first = false;
+          await Future.delayed(const Duration(seconds: 2));
+        }
         // Give the bridge a moment to process the unlink before we start
         // leaving portals; some bridges cancel the logout if the portal
         // membership churns mid-command.
@@ -151,6 +161,67 @@ class AccountLifecycleService {
     );
   }
 
+  /// Non-blocking disconnect: the UI flips to "Disconnecting…" and the
+  /// account is marked disconnected IMMEDIATELY; every slow step (bridge
+  /// logout command, portal sweep, room wipe) runs in the background and a
+  /// toast reports the honest outcome when it finishes. The user can leave
+  /// the screen at any point.
+  static void disconnectInBackground(
+    Client client,
+    NetworkId networkId, {
+    void Function(Iterable<String> roomIds)? onRoomsForgotten,
+  }) {
+    final meta = metaFor(networkId);
+
+    // Instant UI: sticky-disconnect + transient "Disconnecting…" status.
+    NetworkConnectionCache.markDisconnected(networkId);
+    ConnectionManager.instance?.noteDisconnecting(networkId);
+
+    Future<void>(() async {
+      try {
+        final result = await disconnectNetwork(client, networkId,
+            onRoomsForgotten: onRoomsForgotten);
+        showGlobalToast(result.remoteLogoutSent
+            ? '${meta.displayName} disconnected successfully'
+            : '${meta.displayName} removed from Allora — you may still be '
+                'signed in on the official app');
+      } catch (e) {
+        debugPrint('AccountLifecycle: background disconnect failed: $e');
+        showGlobalToast(
+            '${meta.displayName} was removed, but cleanup hit an error.');
+      } finally {
+        ConnectionManager.instance?.noteDisconnected(networkId);
+      }
+    });
+  }
+
+  /// The bridge told us the remote session ended (detected passively by the
+  /// ConnectionManager). Mark disconnected and hide that network's rooms —
+  /// WITHOUT sending any bridge commands, so an intentional `logout` can
+  /// never ping-pong with this handler. Cheap classification only.
+  static Future<void> handleRemoteLogout(
+      Client client, NetworkId networkId) async {
+    final meta = metaFor(networkId);
+    debugPrint('AccountLifecycle: remote logout detected for '
+        '${meta.displayName}');
+    await NetworkConnectionCache.markDisconnected(networkId);
+    ConnectionManager.instance?.noteDisconnected(networkId);
+
+    final portalRooms = <String>[];
+    for (final room in client.rooms) {
+      if (room.membership != Membership.join) continue;
+      if (room.isSpace) continue;
+      if (BridgeRoomClassifier.getNetworkForRoom(room, client: client) ==
+          networkId) {
+        portalRooms.add(room.id);
+      }
+    }
+    await HiddenRoomsStore.hide(networkId, portalRooms);
+    showGlobalToast(
+        '${meta.displayName} was signed out on the official app — '
+        'connection removed');
+  }
+
   /// The bridge bot's 1:1 control room. Located, in order of reliability:
   ///   1. the DM whose partner equals the bot MXID the bridge advertises in
   ///      its own portal `m.bridge` state (the real bot, whatever it runs
@@ -199,10 +270,15 @@ class AccountLifecycleService {
   static Future<void> logoutAllora(Client client) async {
     // Stop live machinery first so nothing writes during teardown.
     ConnectionManager.instance?.shutdown();
+    ScheduledMessageService.shutdown();
+    DisappearingMessageService.shutdown();
     await RoomWipeService.clearQueue();
     for (final id in NetworkId.values) {
       await HiddenRoomsStore.clear(id);
     }
+    // Decoded images belong to the departing session.
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
 
     for (final id in NetworkId.values) {
       await NetworkConnectionCache.markDisconnected(id, suppressMs: 0);

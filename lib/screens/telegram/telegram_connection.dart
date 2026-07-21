@@ -7,9 +7,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:matrix/matrix.dart';
 import 'package:pinput/pinput.dart';
 
-import './networks/network_connection_cache.dart';
-import './networks/network_meta.dart';
-import './bridge/bridge_room_classifier.dart';
+import '../networks/network_connection_cache.dart';
+import '../networks/network_meta.dart';
+import '../bridge/bridge_room_classifier.dart';
 
 // ─── BRAND COLORS ────────────────────────────────────────────────────────────
 const Color kTelegramBlue = Color(0xFF29A9EA);
@@ -464,7 +464,7 @@ class _TelegramConnectSheetState extends State<TelegramConnectSheet> {
             ] else if (_currentStep == TelegramStep.loading) ...[
               const Center(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32.0),git a
+                  padding: EdgeInsets.symmetric(vertical: 32.0),
                   child: CircularProgressIndicator(color: kTelegramBlue),
                 ),
               ),

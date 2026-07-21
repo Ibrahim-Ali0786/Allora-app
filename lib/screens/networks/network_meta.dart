@@ -42,6 +42,12 @@ class NetworkMeta {
   /// stamps `protocol: { id: "whatsapp" }` on every portal, groups included.
   final List<String> bridgeProtocols;
 
+  /// Commands sent to the bridge management room to revoke the remote
+  /// session, in order. mautrix bridges accept `logout`; bridgev2 builds
+  /// also understand `logout all` for multi-login accounts. Platform
+  /// services can override per-bridge quirks here.
+  final List<String> logoutCommands;
+
   const NetworkMeta({
     required this.id,
     required this.displayName,
@@ -54,6 +60,7 @@ class NetworkMeta {
     this.available = true,
     this.extraNameSignals = const [],
     this.bridgeProtocols = const [],
+    this.logoutCommands = const ['logout', 'logout all'],
   });
 
   /// The bridge bot's own Matrix ID on [userDomain], e.g.

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pinput/pinput.dart';
+import '../../features/connect/allora_gateway.dart';
 import '../../features/home_gate.dart';
 import '../../features/privacy/app_lock.dart';
 
@@ -24,7 +25,6 @@ class OtpScreen extends StatefulWidget {
 
 class _OtpScreenState extends State<OtpScreen> {
   bool _isLoading = false;
-  bool _isSuccess = false;
 
   Future<void> _syncMatrixAccount(String supabaseUserId) async {
     final matrixUsername = supabaseUserId.replaceAll('-', '').toLowerCase();
@@ -75,21 +75,33 @@ class _OtpScreenState extends State<OtpScreen> {
       );
 
       if (response.session != null && mounted) {
-        setState(() {
-          _isLoading = false;
-          _isSuccess = true;
-        });
+        setState(() => _isLoading = false);
 
         await _syncMatrixAccount(response.session!.user.id);
-        await Future.delayed(const Duration(seconds: 2));
 
         if (mounted) {
-          // Connect-first: HomeGate shows the connect screen until a
-          // platform is linked, then the chat list. Wrapped in the app lock.
+          // Launch the Allora Gateway animation, clearing the nav stack.
+          // The gateway's onComplete navigates to the inbox.
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(
-                builder: (_) => const LockGate(child: HomeGate())),
+            PageRouteBuilder(
+              pageBuilder: (routeContext, __, ___) => AlloraGateway(
+                onComplete: () {
+                  Navigator.pushReplacement(
+                    routeContext,
+                    PageRouteBuilder(
+                      pageBuilder: (_, __, ___) => const LockGate(child: HomeGate()),
+                      transitionDuration: const Duration(milliseconds: 1000),
+                      transitionsBuilder: (_, animation, __, child) =>
+                          FadeTransition(opacity: animation, child: child),
+                    ),
+                  );
+                },
+              ),
+              transitionDuration: const Duration(milliseconds: 500),
+              transitionsBuilder: (_, animation, __, child) =>
+                  FadeTransition(opacity: animation, child: child),
+            ),
             (route) => false,
           );
         }
@@ -132,60 +144,80 @@ class _OtpScreenState extends State<OtpScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                if (_isSuccess) ...[
-                  TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 600),
-                    curve: Curves.elasticOut,
-                    builder: (context, value, child) {
-                      return Transform.scale(
-                        scale: value,
-                        child: const Icon(Icons.check_circle,
-                            color: Colors.green, size: 120),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 24),
-                  Text('Verification Successful',
-                      style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87)),
-                  const SizedBox(height: 12),
-                  const Text('Securing your workspace...',
-                      style: TextStyle(color: Colors.grey, fontSize: 16)),
-                  const SizedBox(height: 40),
-                  const CircularProgressIndicator(color: Colors.green),
-                ] else ...[
-                  Text('Enter code',
-                      style: GoogleFonts.poppins(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blueAccent.shade700)),
-                  const SizedBox(height: 16),
-                  Text('Check ${widget.contact}\nfor the 6-digit code.',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 16, color: Colors.black87, height: 1.5)),
-                  const SizedBox(height: 40),
-                  if (_isLoading)
-                    const CircularProgressIndicator()
-                  else
-                    Pinput(
-                      length: 6,
-                      autofocus: true,
-                      defaultPinTheme: defaultPinTheme,
-                      // FIXED: Replaced copyDecorationWith to be compatible with all pinput versions
-                      focusedPinTheme: defaultPinTheme.copyWith(
-                          decoration: BoxDecoration(
-                        border: Border.all(
-                            color: Colors.blueAccent.shade700, width: 2),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white,
-                      )),
-                      onCompleted: _verifyOtp,
-                    ),
-                ],
+                Text('Enter code',
+                    style: GoogleFonts.poppins(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blueAccent.shade700)),
+                const SizedBox(height: 16),
+                Text('Check ${widget.contact}\nfor the 6-digit code.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 16, color: Colors.black87, height: 1.5)),
+                const SizedBox(height: 40),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 400),
+                  switchInCurve: Curves.easeOut,
+                  switchOutCurve: Curves.easeIn,
+                  child: _isLoading
+                      ? Column(
+                          key: const ValueKey('loading'),
+                          children: [
+                            const SizedBox(height: 10),
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 80,
+                                  height: 80,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.blueAccent.shade100,
+                                  ),
+                                ),
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.blueAccent.withValues(alpha: 0.2),
+                                        blurRadius: 20,
+                                        spreadRadius: 5,
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipOval(
+                                    child: Image.asset('assets/images/app_icon.png', fit: BoxFit.cover),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 32),
+                            Text('Authenticating securely...',
+                                style: GoogleFonts.poppins(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.5,
+                                    color: Colors.blueAccent.shade700)),
+                          ],
+                        )
+                      : Pinput(
+                          key: const ValueKey('pinput'),
+                          length: 6,
+                          autofocus: true,
+                          defaultPinTheme: defaultPinTheme,
+                          focusedPinTheme: defaultPinTheme.copyWith(
+                              decoration: BoxDecoration(
+                            border: Border.all(
+                                color: Colors.blueAccent.shade700, width: 2),
+                            borderRadius: BorderRadius.circular(12),
+                            color: Colors.white,
+                          )),
+                          onCompleted: _verifyOtp,
+                        ),
+                ),
               ],
             ),
           ),

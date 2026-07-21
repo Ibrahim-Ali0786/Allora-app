@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart' hide Visibility;
+import '../../features/connect/connection_sequence.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:matrix/matrix.dart';
@@ -282,13 +283,8 @@ class _WhatsAppConnectSheetState extends State<WhatsAppConnectSheet> {
       // ──────────────────────────────────────────────────────────────────────
       widget.onConnected?.call();
 
-      // ──────────────────────────────────────────────────────────────────────
-      // STEP 7: Wait briefly for success animation, then auto-close sheet
-      // ──────────────────────────────────────────────────────────────────────
-      await Future.delayed(const Duration(milliseconds: 1500));
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      // STEP 7: the ConnectionSequence widget now owns the success
+      // animation and closes the sheet itself when it completes.
     } catch (e) {
       debugPrint('❌ Error in success handler: $e');
       if (mounted) {
@@ -543,40 +539,17 @@ class _WhatsAppConnectSheetState extends State<WhatsAppConnectSheet> {
               const SizedBox(height: 32),
             ],
 
-            // 🟢 SUCCESS STATE
+            // 🟢 SUCCESS STATE — enterprise connection sequence (no
+            // checkmark bursts): staged status text + animated line, then
+            // the sheet closes itself and HomeGate drops into the inbox.
             if (_isConnected) ...[
               Center(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 40),
-                    // Large WhatsApp Icon inside a success halo
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: kWaGreen.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                            color: kWaGreen.withOpacity(0.3), width: 2),
-                      ),
-                      child: Center(
-                        child: Image.asset('assets/images/whatsapp.png',
-                            width: 48, height: 48),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    Text('Connected',
-                        style: GoogleFonts.inter(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87)),
-                    const SizedBox(height: 8),
-                    Text('Your WhatsApp chats are now syncing.',
-                        style: GoogleFonts.inter(
-                            fontSize: 15, color: Colors.grey.shade600)),
-                    const SizedBox(height: 48),
-                    _buildPillButton("Done", () => Navigator.pop(context)),
-                  ],
+                child: ConnectionSequence(
+                  brandColor: kWaGreen,
+                  artworkAsset: 'assets/images/whatsapp.png',
+                  onDone: () {
+                    if (mounted) Navigator.pop(context);
+                  },
                 ),
               ),
             ]

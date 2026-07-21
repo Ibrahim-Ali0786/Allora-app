@@ -61,26 +61,15 @@ class _NetworkAccountSheetState extends State<_NetworkAccountSheet> {
   DisconnectResult? _result;
   String? _error;
 
-  Future<void> _disconnect() async {
+  void _disconnect() {
     HapticFeedback.heavyImpact();
-    setState(() => _phase = _Phase.working);
-    try {
-      final result = await AccountLifecycleService.disconnectNetwork(
-          widget.client, widget.meta.id);
-      if (!mounted) return;
-      widget.onDisconnected?.call();
-      setState(() {
-        _result = result;
-        _phase = _Phase.done;
-      });
-      HapticFeedback.mediumImpact();
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _phase = _Phase.error;
-        _error = e.toString();
-      });
-    }
+    // Non-blocking: account flips to "Disconnecting…" instantly, the sheet
+    // closes, and bridge logout + room cleanup run in the background. A
+    // toast reports the honest outcome when everything finishes.
+    AccountLifecycleService.disconnectInBackground(
+        widget.client, widget.meta.id);
+    widget.onDisconnected?.call();
+    Navigator.pop(context);
   }
 
   @override

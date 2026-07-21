@@ -16,6 +16,7 @@ enum ConnState {
   connected,
   syncing,
   reconnecting,
+  disconnecting,
   disconnected,
   expired,
   error,
@@ -32,6 +33,8 @@ extension ConnStateLabel on ConnState {
         return 'Syncing…';
       case ConnState.reconnecting:
         return 'Reconnecting…';
+      case ConnState.disconnecting:
+        return 'Disconnecting…';
       case ConnState.disconnected:
         return 'Disconnected';
       case ConnState.expired:
@@ -83,6 +86,8 @@ class ConnectionManager extends StateNotifier<ConnectionSnapshot> {
   StreamSubscription? _syncSub;
   StreamSubscription? _loginSub;
   StreamSubscription? _probeSub;
+  StreamSubscription? _remoteLogoutSub;
+  final Map<NetworkId, DateTime> _remoteLogoutHandled = {};
   Timer? _probeTimeout;
   bool _lastSyncErrored = false;
   final Map<NetworkId, ConnState> _transient = {};
@@ -94,6 +99,8 @@ class ConnectionManager extends StateNotifier<ConnectionSnapshot> {
 
     _syncSub = client.onSyncStatus.stream.listen(_onSyncStatus);
     _loginSub = client.onLoginStateChanged.stream.listen(_onLoginState);
+    _remoteLogoutSub =
+        client.onTimelineEvent.stream.listen(_onPossibleRemoteLogout);
 
     // Seed the matrix state from what we already know.
     if (!client.isLogged()) {
@@ -165,6 +172,22 @@ class ConnectionManager extends StateNotifier<ConnectionSnapshot> {
   /// Transient overlays from connect/disconnect flows.
   void noteConnecting(NetworkId id) => _setTransient(id, ConnState.connecting);
   void noteSyncing(NetworkId id) => _setTransient(id, ConnState.syncing);
+  void noteDisconnecting(NetworkId id) =>
+      _setTransient(id, ConnState.disconnecting);
+
+  final Map<NetworkId, Timer> _syncStageTimers = {};
+
+  /// After a fresh login the bridge backfills chats for a while: show
+  /// "Syncing…" on the account row, then settle to Connected. Purely
+  /// presentational on top of the persisted connected state.
+  void noteJustConnected(NetworkId id, {Duration syncFor = const Duration(seconds: 6)}) {
+    _setTransient(id, ConnState.syncing);
+    _syncStageTimers[id]?.cancel();
+    _syncStageTimers[id] = Timer(syncFor, () {
+      _transient.remove(id);
+      _recomputeNetworks();
+    });
+  }
 
   void noteConnected(NetworkId id) {
     _transient.remove(id);
@@ -179,6 +202,53 @@ class ConnectionManager extends StateNotifier<ConnectionSnapshot> {
   void _setTransient(NetworkId id, ConnState s) {
     _transient[id] = s;
     _recomputeNetworks();
+  }
+
+  /// Passive remote-logout detection (the "official app logged out but
+  /// Allora still shows connected" fix). When a bridge bot announces in its
+  /// management DM that the session ended, flip the network to disconnected
+  /// and hide its rooms immediately — without sending any commands back
+  /// (so this can never loop with an intentional disconnect).
+  Future<void> _onPossibleRemoteLogout(Event event) async {
+    try {
+      if (event.senderId == client.userID) return;
+      final body = event.content['body']?.toString().toLowerCase() ?? '';
+      if (body.isEmpty) return;
+      const signals = [
+        'logged out',
+        'was logged out',
+        'you have been logged out',
+        'session expired',
+        'credentials are no longer valid',
+        'disconnected from',
+      ];
+      if (!signals.any(body.contains)) return;
+
+      final roomId = event.roomId;
+      if (roomId == null) return;
+      final room = client.getRoomById(roomId);
+      if (room == null) return;
+
+      for (final meta in kNetworks) {
+        if (!meta.available) continue;
+        if (!NetworkConnectionCache.get(meta.id).connected) continue;
+        final mgmt =
+            AccountLifecycleService.findManagementRoom(client, meta.id);
+        if (mgmt?.id != roomId) continue;
+
+        // Debounce: at most one auto-handle per network per minute.
+        final last = _remoteLogoutHandled[meta.id];
+        if (last != null &&
+            DateTime.now().difference(last) < const Duration(minutes: 1)) {
+          return;
+        }
+        _remoteLogoutHandled[meta.id] = DateTime.now();
+        await AccountLifecycleService.handleRemoteLogout(client, meta.id);
+        return;
+      }
+    } catch (e) {
+      debugPrint('ConnectionManager: remote-logout check failed: $e');
+    }
   }
 
   // ── Probing ──────────────────────────────────────────────────────────────
@@ -255,6 +325,10 @@ class ConnectionManager extends StateNotifier<ConnectionSnapshot> {
     NetworkConnectionCache.notifier.removeListener(_recomputeNetworks);
     _syncSub?.cancel();
     _loginSub?.cancel();
+    _remoteLogoutSub?.cancel();
+    for (final t in _syncStageTimers.values) {
+      t.cancel();
+    }
     shutdown();
     if (identical(instance, this)) instance = null;
     super.dispose();

@@ -52,6 +52,7 @@ class AppSettingsState {
   final bool highContrast;
   final String bio;
   final String displayName;
+  final bool floatingChatEnabled;
 
   // ── Privacy / Incognito ──
   final bool incognito; // master switch
@@ -90,6 +91,7 @@ class AppSettingsState {
     this.highContrast = false,
     this.bio = '',
     this.displayName = '',
+    this.floatingChatEnabled = false,
     this.incognito = false,
     this.hideTyping = false,
     this.hideReadReceipts = false,
@@ -125,6 +127,7 @@ class AppSettingsState {
     bool? highContrast,
     String? bio,
     String? displayName,
+    bool? floatingChatEnabled,
     bool? incognito,
     bool? hideTyping,
     bool? hideReadReceipts,
@@ -154,6 +157,7 @@ class AppSettingsState {
       highContrast: highContrast ?? this.highContrast,
       bio: bio ?? this.bio,
       displayName: displayName ?? this.displayName,
+      floatingChatEnabled: floatingChatEnabled ?? this.floatingChatEnabled,
       incognito: incognito ?? this.incognito,
       hideTyping: hideTyping ?? this.hideTyping,
       hideReadReceipts: hideReadReceipts ?? this.hideReadReceipts,
@@ -184,6 +188,7 @@ class AppSettingsState {
         'highContrast': highContrast,
         'bio': bio,
         'displayName': displayName,
+        'floatingChatEnabled': floatingChatEnabled,
         'incognito': incognito,
         'hideTyping': hideTyping,
         'hideReadReceipts': hideReadReceipts,
@@ -217,6 +222,7 @@ class AppSettingsState {
       highContrast: j['highContrast'] as bool? ?? false,
       bio: j['bio'] as String? ?? '',
       displayName: j['displayName'] as String? ?? '',
+      floatingChatEnabled: j['floatingChatEnabled'] as bool? ?? false,
       incognito: j['incognito'] as bool? ?? false,
       hideTyping: j['hideTyping'] as bool? ?? false,
       hideReadReceipts: j['hideReadReceipts'] as bool? ?? false,
@@ -275,6 +281,8 @@ class SettingsController extends StateNotifier<AppSettingsState> {
   void setHighContrast(bool v) => _commit(state.copyWith(highContrast: v));
   void setBio(String v) => _commit(state.copyWith(bio: v));
   void setDisplayName(String v) => _commit(state.copyWith(displayName: v));
+  void setFloatingChatEnabled(bool v) =>
+      _commit(state.copyWith(floatingChatEnabled: v));
 
   // ── Privacy ──
   void setIncognito(bool v) => _commit(state.copyWith(incognito: v));

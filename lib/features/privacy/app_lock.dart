@@ -6,7 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../data/services/floating_chat_service.dart';
 import '../../data/settings/app_settings.dart';
+import '../../providers/network_provider.dart';
 
 /// Android FLAG_SECURE bridge: blocks screenshots and hides the app's
 /// content in the recent-apps switcher. No-ops silently on platforms
@@ -67,6 +69,18 @@ class _LockGateState extends ConsumerState<LockGate>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final settings = ref.read(settingsProvider);
+
+    // Floating chat bubble: appear when the app is backgrounded, disappear on
+    // return. FloatingChatService itself no-ops without permission / on
+    // non-Android, so this is always safe.
+    if (settings.floatingChatEnabled) {
+      if (state == AppLifecycleState.paused) {
+        FloatingChatService.show(unread: _totalUnread());
+      } else if (state == AppLifecycleState.resumed) {
+        FloatingChatService.hide();
+      }
+    }
+
     if (!settings.appLockEnabled) return;
 
     if (state == AppLifecycleState.paused ||
@@ -80,6 +94,19 @@ class _LockGateState extends ConsumerState<LockGate>
       if (elapsed.inSeconds >= settings.autoLockMinutes * 60) {
         ref.read(appLockedProvider.notifier).state = true;
       }
+    }
+  }
+
+  int _totalUnread() {
+    try {
+      final client = ref.read(matrixClientProvider);
+      var total = 0;
+      for (final room in client.rooms) {
+        total += room.notificationCount;
+      }
+      return total;
+    } catch (_) {
+      return 0;
     }
   }
 

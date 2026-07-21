@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/settings/app_settings.dart';
 import '../providers/network_provider.dart';
-import '../screens/connect_networks_screen.dart';
+import '../screens/connection_screen/connect_networks_screen.dart';
 import 'chat_list/chat_list_screen.dart';
 
 /// The post-login home. Reactively shows:

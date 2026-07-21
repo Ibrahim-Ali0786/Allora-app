@@ -4,22 +4,22 @@ import 'package:flutter/material.dart' hide Visibility;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import './telegram_connection.dart';
-import './facebook_messenger_connection.dart';
-import './discord_connection.dart';
-import './slack_connection.dart';
-import './twitter_connection.dart';
-import './auth/welcome_screen.dart';
-import './whatsapp/whatsapp_connection.dart';
-import './instagram_connection.dart';
-import '../data/services/account_lifecycle.dart';
-import '../data/services/connection_manager.dart';
-import '../data/services/hidden_rooms_store.dart';
-import './networks/network_account_sheet.dart';
-import './networks/network_meta.dart';
-import './networks/network_connection_cache.dart';
-import './bridge/bridge_room_classifier.dart';
-import '../providers/network_provider.dart'; // Riverpod Provider
+import '../telegram/telegram_connection.dart';
+import '../facebook/facebook_messenger_connection.dart';
+import '../discord/discord_connection.dart';
+import '../slack/slack_connection.dart';
+import '../twitter/twitter_connection.dart';
+import '../auth/welcome_screen.dart';
+import '../whatsapp/whatsapp_connection.dart';
+import '../instagram/instagram_connection.dart';
+import '../../data/services/account_lifecycle.dart';
+import '../../data/services/connection_manager.dart';
+import '../../data/services/hidden_rooms_store.dart';
+import '../networks/network_account_sheet.dart';
+import '../networks/network_meta.dart';
+import '../networks/network_connection_cache.dart';
+import '../bridge/bridge_room_classifier.dart';
+import '../../providers/network_provider.dart'; // Riverpod Provider
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────────
 class _T {
@@ -186,6 +186,10 @@ class _ConnectNetworksScreenState extends ConsumerState<ConnectNetworksScreen> {
       // chat list. HomeGate watches the connected state and swaps this screen
       // for the inbox on its own.
       NetworkConnectionCache.markConnected(net.meta.id, force: true);
+      // Row shows "Syncing…" while the bridge backfills, then "Connected".
+      ref
+          .read(connectionManagerProvider.notifier)
+          .noteJustConnected(net.meta.id, syncFor: const Duration(seconds: 8));
       // Reconnecting un-hides anything we hid when it was disconnected.
       HiddenRoomsStore.clear(net.meta.id);
       if (net.meta.id == NetworkId.whatsapp) {
@@ -552,23 +556,73 @@ class _Glyph extends StatelessWidget {
                   : Icon(net.meta.icon, color: Colors.white, size: 18))));
 }
 
-class _Status extends StatelessWidget {
+class _Status extends ConsumerWidget {
   final NetworkAccount net;
   const _Status({required this.net});
+
   @override
-  Widget build(BuildContext ctx) {
+  Widget build(BuildContext ctx, WidgetRef ref) {
+    // Live per-account state: Connected / Syncing… / Disconnecting… /
+    // Reconnecting… update in real time from the ConnectionManager streams.
+    final live = ref.watch(connectionManagerProvider
+        .select((s) => s.networks[net.meta.id]));
+
     switch (net.status) {
       case NetworkStatus.connected:
-        return Row(mainAxisSize: MainAxisSize.min, children: const [
-          Icon(Icons.check_circle, size: 15, color: _T.positive),
-          SizedBox(width: 4),
-          Text('Connected',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: _T.positive))
-        ]);
+        final state = live ?? ConnState.connected;
+        final busy = state == ConnState.syncing ||
+            state == ConnState.connecting ||
+            state == ConnState.reconnecting ||
+            state == ConnState.disconnecting;
+        final color = state == ConnState.error
+            ? _T.destructive
+            : busy
+                ? _T.accent
+                : _T.positive;
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: Row(
+            key: ValueKey(state),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (busy)
+                const SizedBox(
+                    width: 13,
+                    height: 13,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: _T.accent))
+              else
+                Icon(
+                    state == ConnState.error
+                        ? Icons.error_rounded
+                        : Icons.check_circle,
+                    size: 15,
+                    color: color),
+              const SizedBox(width: 4),
+              Text(state.label,
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: color)),
+            ],
+          ),
+        );
       case NetworkStatus.available:
+        if (live == ConnState.disconnecting) {
+          return Row(mainAxisSize: MainAxisSize.min, children: const [
+            SizedBox(
+                width: 13,
+                height: 13,
+                child: CircularProgressIndicator(
+                    strokeWidth: 2, color: _T.onSurfaceMuted)),
+            SizedBox(width: 4),
+            Text('Disconnecting…',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: _T.onSurfaceVariant)),
+          ]);
+        }
         return const Text('Connect',
             style: TextStyle(
                 fontSize: 13, fontWeight: FontWeight.w600, color: _T.accent));
