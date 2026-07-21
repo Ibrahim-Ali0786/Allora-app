@@ -37,14 +37,26 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _query = '';
 
+  /// Same priority chain as ProfileScreen: local setting → email prefix → Matrix ID.
+  String _resolvedName(AppSettingsState settings, String matrixId) {
+    if (settings.displayName.isNotEmpty) return settings.displayName;
+    final email = Supabase.instance.client.auth.currentUser?.email;
+    if (email != null && email.contains('@')) {
+      final local = email.split('@').first.toLowerCase();
+      final cleaned = local.replaceAll(RegExp(r'[^a-z0-9._-]'), '');
+      if (cleaned.isNotEmpty) return cleaned;
+    }
+    return matrixId;
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = context.allora;
     final client = ref.watch(matrixClientProvider);
     final settings = ref.watch(settingsProvider);
     final email = Supabase.instance.client.auth.currentUser?.email;
-    final username =
-        client.userID?.split(':').first.replaceAll('@', '') ?? 'You';
+    final matrixId = client.userID?.split(':').first.replaceAll('@', '') ?? 'You';
+    final username = _resolvedName(settings, matrixId);
 
     final sections = <_SettingsSection>[
       _SettingsSection('General', [
@@ -53,7 +65,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           color: const Color(0xFF3A6FF8),
           title: 'Accounts',
           subtitle: 'Connect WhatsApp, Telegram, Instagram…',
-          keywords: 'accounts networks bridge connect whatsapp telegram',
+          keywords: 'accounts networks bridge connect whatsapp telegram instagram',
           onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -285,35 +297,46 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         onTap: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const ProfileScreen())),
         child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            AlloraAvatar(name: username, size: 52, showNetworkBadge: false),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          fontSize: 16.5,
-                          fontWeight: FontWeight.w700,
-                          color: c.text)),
-                  if (email != null)
-                    Text(email,
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              AlloraAvatar(name: username, size: 52, showNetworkBadge: false),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(username,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                            fontSize: 13, color: c.textSecondary)),
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w700,
+                            color: c.text)),
+                    if (email != null)
+                      Text(email,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              fontSize: 13, color: c.textSecondary)),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Edit profile',
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          color: c.accent,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.chevron_right_rounded, color: c.textTertiary),
                 ],
               ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: c.textTertiary),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     ]);
   }

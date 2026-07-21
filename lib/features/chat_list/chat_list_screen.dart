@@ -157,26 +157,67 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
         ref.watch(chatFilterProvider) == ChatFilter.all &&
         ref.watch(networkFilterProvider) == null;
 
-    final rows = <Widget>[
-      if (showAiRow) const _AlloraAiRow(),
-      if (data.pinned.isNotEmpty) ...[
-        _SectionLabel(icon: Icons.push_pin_rounded, label: 'Pinned'),
-        for (final entry in data.pinned) _tile(entry),
-        if (data.chats.isNotEmpty)
-          _SectionLabel(icon: Icons.chat_bubble_rounded, label: 'Chats'),
-      ],
-      for (final entry in data.chats) _tile(entry),
-      if (data.archivedCount > 0) _archivedRow(data.archivedCount),
-      const SizedBox(height: 96), // FAB clearance
-    ];
+    final hasPinned = data.pinned.isNotEmpty;
+    final hasChats = data.chats.isNotEmpty;
+    final hasArchived = data.archivedCount > 0;
+
+    int itemCount = 0;
+    if (showAiRow) itemCount++;
+    if (hasPinned) {
+      itemCount++; // Pinned label
+      itemCount += data.pinned.length;
+      if (hasChats) itemCount++; // Chats label
+    }
+    if (hasChats) itemCount += data.chats.length;
+    if (hasArchived) itemCount++; // Archived row
+    itemCount++; // FAB clearance
 
     return ListView.builder(
       physics: const BouncingScrollPhysics(
           parent: AlwaysScrollableScrollPhysics()),
-      itemCount: rows.length,
-      itemBuilder: (context, i) => rows[i],
-      // Rows are cheap; keep a healthy cache so fast flings never blank.
-      cacheExtent: 600,
+      itemCount: itemCount,
+      cacheExtent: 400,
+      itemBuilder: (context, index) {
+        var idx = index;
+        if (showAiRow) {
+          if (idx == 0) return const _AlloraAiRow();
+          idx--;
+        }
+
+        if (hasPinned) {
+          if (idx == 0) {
+            return const _SectionLabel(
+                icon: Icons.push_pin_rounded, label: 'Pinned');
+          }
+          idx--;
+          if (idx < data.pinned.length) {
+            return _tile(data.pinned[idx]);
+          }
+          idx -= data.pinned.length;
+
+          if (hasChats) {
+            if (idx == 0) {
+              return const _SectionLabel(
+                  icon: Icons.chat_bubble_rounded, label: 'Chats');
+            }
+            idx--;
+          }
+        }
+
+        if (hasChats) {
+          if (idx < data.chats.length) {
+            return _tile(data.chats[idx]);
+          }
+          idx -= data.chats.length;
+        }
+
+        if (hasArchived) {
+          if (idx == 0) return _archivedRow(data.archivedCount);
+          idx--;
+        }
+
+        return const SizedBox(height: 96);
+      },
     );
   }
 

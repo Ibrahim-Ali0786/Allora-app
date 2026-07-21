@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:matrix/matrix.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:pinput/pinput.dart';
-import '../../features/connect/allora_gateway.dart';
 import '../../features/home_gate.dart';
 import '../../features/privacy/app_lock.dart';
 
@@ -80,25 +79,12 @@ class _OtpScreenState extends State<OtpScreen> {
         await _syncMatrixAccount(response.session!.user.id);
 
         if (mounted) {
-          // Launch the Allora Gateway animation, clearing the nav stack.
-          // The gateway's onComplete navigates to the inbox.
+          // Go directly to the home/connect screen with a clean 600ms fade.
           Navigator.pushAndRemoveUntil(
             context,
             PageRouteBuilder(
-              pageBuilder: (routeContext, __, ___) => AlloraGateway(
-                onComplete: () {
-                  Navigator.pushReplacement(
-                    routeContext,
-                    PageRouteBuilder(
-                      pageBuilder: (_, __, ___) => const LockGate(child: HomeGate()),
-                      transitionDuration: const Duration(milliseconds: 1000),
-                      transitionsBuilder: (_, animation, __, child) =>
-                          FadeTransition(opacity: animation, child: child),
-                    ),
-                  );
-                },
-              ),
-              transitionDuration: const Duration(milliseconds: 500),
+              pageBuilder: (_, __, ___) => const LockGate(child: HomeGate()),
+              transitionDuration: const Duration(milliseconds: 600),
               transitionsBuilder: (_, animation, __, child) =>
                   FadeTransition(opacity: animation, child: child),
             ),

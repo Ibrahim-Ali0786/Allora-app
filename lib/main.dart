@@ -285,39 +285,8 @@ class _AlloraAppState extends ConsumerState<AlloraApp> {
   }
 }
 
-class _SplashScreen extends StatefulWidget {
+class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
-
-  @override
-  State<_SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<_SplashScreen> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _scale;
-  late final Animation<double> _glow;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    )..repeat(reverse: true);
-
-    _scale = Tween<double>(begin: 0.98, end: 1.05).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOutSine),
-    );
-    _glow = Tween<double>(begin: 0.2, end: 0.6).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOutSine),
-    );
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -325,45 +294,28 @@ class _SplashScreenState extends State<_SplashScreen> with SingleTickerProviderS
     return Scaffold(
       backgroundColor: c.canvas,
       body: Center(
-        child: AnimatedBuilder(
-          animation: _ctrl,
-          builder: (context, _) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Transform.scale(
-                  scale: _scale.value,
-                  child: Container(
-                    width: 86,
-                    height: 86,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: c.accent.withValues(alpha: _glow.value),
-                          blurRadius: 40 * _scale.value,
-                          spreadRadius: 10 * _glow.value,
-                        ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: Image.asset('assets/images/app_icon.png', fit: BoxFit.cover),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 28),
-                Opacity(
-                  opacity: 0.7 + (_glow.value * 0.5),
-                  child: Text('Allora',
-                      style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.5,
-                          color: c.text)),
-                ),
-              ],
-            );
-          },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'assets/images/app_icon.png',
+                width: 84,
+                height: 84,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Allora',
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+                color: c.text,
+              ),
+            ),
+          ],
         ),
       ),
     );
